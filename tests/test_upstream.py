@@ -90,5 +90,10 @@ async def test_verified_browse_and_magnet_protocol(monkeypatch) -> None:
 
     assert browse_count == 2  # token-less first response caused a full session rotation
     assert len(results) == 12
-    assert all(result.magnet and result.magnet.startswith("magnet:") for result in results)
-    assert len(requests) == 14
+    # Only the top EAGER_MAGNETS (10) by seeders get eager magnets; the rest are
+    # listed without an enclosure and resolve via t=detail.
+    with_magnet = [r for r in results if r.magnet]
+    assert len(with_magnet) == 10
+    assert all(r.magnet and r.magnet.startswith("magnet:") for r in with_magnet)
+    assert all(r.seeders >= max(r.seeders for r in results[10:]) for r in with_magnet)
+    assert len(requests) == 12  # 2 browses + 10 signed magnet POSTs

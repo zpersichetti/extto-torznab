@@ -152,30 +152,78 @@ class ExtToClient:
                     await self._browse(*self._browse_context)
         raise UpstreamError(f"could not fetch magnet for torrent {torrent_id}") from last_error
 
+    async def _probe(self) -> None:
+        """Startup health probe: a 200 from the browse page is enough.
+
+        Note: an EMPTY-query browse response carries no searchPageToken (the
+        token is only emitted on real search pages), so the probe must not
+        require parseable tokens — they are acquired lazily on first search.
+        """
+        last_error: Exception | None = None
+        for attempt in range(4):
+            try:
+                response = await self._paced_request(
+                    "GET", "/browse/", params={"page": 1, "page_size": 1}
+                )
+                response.raise_for_status()
+                self.last_success = datetime.now(UTC)
+                return
+            except httpx.HTTPError as exc:
+                last_error = exc
+                await self._rotate_session()
+                if attempt < 3:
+                    await self._backoff(attempt)
+        raise UpstreamError("could not reach extto.com") from last_error
+
     async def bootstrap(self) -> None:
         async with self._workflow_lock:
-            await self._browse("")
+            await self._probe()
 
     async def search(self, query: str, category: int | None = None) -> list[Torrent]:
         async with self._workflow_lock:
             ext_category = ext_category_for(category)
             page = await self._browse(query, ext_category)
+            # Fetch magnets eagerly only for the top-seeded results: each magnet
+            # POST is paced (MIN_INTERVAL), so 50 eager magnets would stall a
+            # search for minutes. The rest are listed without an enclosure and
+            # get their magnet on demand via t=detail. A per-item failure must
+            # never kill the whole result set.
+            ordered = sorted(page.results, key=lambda t: t.seeders, reverse=True)
             results: list[Torrent] = []
-            for torrent in page.results:
-                with_magnet = torrent.with_magnet(await self._magnet(torrent.id))
-                self._torrent_cache[torrent.id] = with_magnet
-                results.append(with_magnet)
+            for torrent in ordered:
+                if len(results) < self.settings.eager_magnets:
+                    try:
+                        torrent = torrent.with_magnet(await self._magnet(torrent.id))
+                    except UpstreamError:
+                        LOGGER.warning(
+                            "magnet fetch failed for %s; listing without magnet",
+                            torrent.id,
+                        )
+                    self._torrent_cache[torrent.id] = torrent
+                else:
+                    self._torrent_cache.setdefault(torrent.id, torrent)
+                results.append(torrent)
             return results
 
     async def detail(self, torrent_id: str) -> Torrent | None:
         async with self._workflow_lock:
             cached = self._torrent_cache.get(torrent_id)
             if cached is not None:
-                return cached
+                if cached.magnet is not None:
+                    return cached
+                try:
+                    return cached.with_magnet(await self._magnet(torrent_id))
+                except UpstreamError:
+                    LOGGER.warning("magnet fetch failed for %s", torrent_id)
+                    return cached
+            # Cache miss: best-effort lookup by searching the site for the id.
             page = await self._browse(torrent_id)
             torrent = next((item for item in page.results if item.id == torrent_id), None)
             if torrent is None:
                 return None
-            result = torrent.with_magnet(await self._magnet(torrent.id))
-            self._torrent_cache[torrent.id] = result
-            return result
+            try:
+                torrent = torrent.with_magnet(await self._magnet(torrent.id))
+            except UpstreamError:
+                LOGGER.warning("magnet fetch failed for %s", torrent_id)
+            self._torrent_cache[torrent.id] = torrent
+            return torrent

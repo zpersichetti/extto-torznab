@@ -12,6 +12,7 @@ class Settings:
     backoff_initial: float = 9.0
     backoff_cap: float = 120.0
     magnet_cache_ttl: float = 86_400.0
+    eager_magnets: int = 10
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -24,4 +25,5 @@ class Settings:
             backoff_initial=float(os.getenv("BACKOFF_INITIAL", "9")),
             backoff_cap=float(os.getenv("BACKOFF_CAP", "120")),
             magnet_cache_ttl=float(os.getenv("MAGNET_CACHE_TTL", "86400")),
+            eager_magnets=int(os.getenv("EAGER_MAGNETS", "10")),
         )

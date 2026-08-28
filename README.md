@@ -28,9 +28,13 @@ Configuration:
 | `REQUEST_TIMEOUT` | `25` | Upstream HTTP timeout in seconds |
 | `HEALTH_MAX_AGE` | `900` | Maximum age of a successful upstream response |
 | `MAGNET_CACHE_TTL` | `86400` | Magnet cache lifetime in seconds |
+| `EAGER_MAGNETS` | `10` | How many top-seeded results get magnets in search responses; the rest resolve on demand via `t=detail` |
 
 Do not set `MIN_INTERVAL` below 3 against the public mirror. Burst traffic has
-been observed to trigger Cloudflare blocks.
+been observed to trigger Cloudflare blocks. Each magnet fetch is a separate paced
+request, so search responses are limited to `EAGER_MAGNETS` eager magnets — the
+remaining results are listed without an enclosure and get their magnet when
+Prowlarr queries `t=detail` for a grab.
 
 ## Add it to Prowlarr
 
