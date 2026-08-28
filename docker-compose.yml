@@ -1,0 +1,10 @@
+services:
+  extto-torznab:
+    build: .
+    environment:
+      API_KEY: "${API_KEY:?Set API_KEY before starting the service}"
+      UPSTREAM_BASE: "${UPSTREAM_BASE:-https://extto.com}"
+      MIN_INTERVAL: "${MIN_INTERVAL:-3}"
+    ports:
+      - "8123:8123"
+    restart: unless-stopped
