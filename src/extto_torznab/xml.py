@@ -1,7 +1,7 @@
 from email.utils import format_datetime
 from xml.etree import ElementTree as ET
 
-from .categories import CATEGORIES
+from .categories import CATEGORIES, SUBCATEGORIES
 from .models import Torrent
 
 TORZNAB_NS = "http://torznab.com/schemas/2015/feed"
@@ -21,7 +21,14 @@ def render_caps() -> bytes:
     ET.SubElement(searching, "book-search", available="no", supportedParams="")
     categories = ET.SubElement(root, "categories")
     for category in CATEGORIES:
-        ET.SubElement(categories, "category", id=str(category.newznab_id), name=category.name)
+        cat_el = ET.SubElement(
+            categories, "category", id=str(category.newznab_id), name=category.name
+        )
+        for subcategory in SUBCATEGORIES:
+            if subcategory.parent_id == category.newznab_id:
+                ET.SubElement(
+                    cat_el, "subcat", id=str(subcategory.newznab_id), name=subcategory.name
+                )
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
