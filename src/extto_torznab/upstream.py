@@ -208,6 +208,12 @@ class ExtToClient:
                     LOGGER.warning("magnet fetch failed for %s; skipping", torrent.id)
                     continue
                 self._torrent_cache[torrent.id] = torrent
+                # Tag results with the requested Newznab category: extto.com only
+                # exposes top-level sections (audiobooks/ebooks both live under
+                # "Books"), so returning the section id (7000) makes Prowlarr/RMAB
+                # drop results for subcategory queries like 3030/7020.
+                if category is not None:
+                    torrent = torrent.with_category(category)
                 results.append(torrent)
             return results
 

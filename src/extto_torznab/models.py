@@ -23,3 +23,6 @@ class Torrent:
 
     def with_magnet(self, magnet: str) -> "Torrent":
         return replace(self, magnet=magnet)
+
+    def with_category(self, category: int) -> "Torrent":
+        return replace(self, category=category)

@@ -96,6 +96,7 @@ async def test_verified_browse_and_magnet_protocol(monkeypatch) -> None:
     with_magnet = [r for r in results if r.magnet]
     assert len(with_magnet) == 10
     assert all(r.magnet and r.magnet.startswith("magnet:") for r in with_magnet)
+    assert all(r.category == 4000 for r in results)  # tagged with requested category
     assert len(requests) == 12  # 2 browses + 10 signed magnet POSTs
 
 
