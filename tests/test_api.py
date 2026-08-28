@@ -76,10 +76,12 @@ async def test_search_maps_newznab_category() -> None:
     assert ET.fromstring(response.content).findtext("./channel/item/guid") == "123"
 
 
-async def test_search_requires_query() -> None:
-    async with client() as (ac, _):
+async def test_search_without_query_uses_latest() -> None:
+    async with client() as (ac, upstream):
         response = await ac.get("/api", params={"t": "search", "apikey": "secret"})
-    assert response.status_code == 400
+    assert response.status_code == 200
+    assert upstream.search_args == ("", None)
+    assert ET.fromstring(response.content).findtext("./channel/item/guid") == "123"
 
 
 async def test_detail_and_health() -> None:

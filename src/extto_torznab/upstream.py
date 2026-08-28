@@ -84,7 +84,11 @@ class ExtToClient:
         await asyncio.sleep(delay)
 
     async def _browse(self, query: str, ext_category: int | None = None) -> BrowsePage:
-        params: dict[str, str | int] = {"q": query, "page": 1, "page_size": 50}
+        params: dict[str, str | int] = {}
+        if query:
+            params["q"] = query
+        params["page"] = 1
+        params["page_size"] = 50
         if ext_category is not None:
             params["cat"] = ext_category
         last_error: Exception | None = None
@@ -181,7 +185,14 @@ class ExtToClient:
 
     async def search(self, query: str, category: int | None = None) -> list[Torrent]:
         async with self._workflow_lock:
-            ext_category = ext_category_for(category)
+            if query:
+                ext_category = ext_category_for(category)
+            else:
+                # extto.com only renders a results table when a category is
+                # given (its bare browse page is empty), so an empty query —
+                # Prowlarr's "latest"/test probe — falls back to Movies (cat=1),
+                # the largest section, to return a real, recent result set.
+                ext_category = 1
             page = await self._browse(query, ext_category)
             # Fetch magnets eagerly only for the top-seeded results: each magnet
             # POST is paced (MIN_INTERVAL), so 50 eager magnets would stall a

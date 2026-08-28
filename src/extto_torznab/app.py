@@ -76,10 +76,10 @@ def create_app(
             return Response(render_caps(), media_type="application/xml")
         try:
             if mode == "search":
-                if not q or not q.strip():
-                    raise HTTPException(status_code=400, detail="q is required for search")
                 category = _parse_category(cat)
-                torrents = await extto.search(q.strip(), category)
+                # An empty q is Prowlarr's "latest"/test probe; the upstream
+                # client maps that to a default-category browse (see ExtToClient.search).
+                torrents = await extto.search((q or "").strip(), category)
             elif mode == "detail":
                 if not torrent_id:
                     raise HTTPException(status_code=400, detail="id is required for detail")

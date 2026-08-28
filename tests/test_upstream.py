@@ -97,3 +97,44 @@ async def test_verified_browse_and_magnet_protocol(monkeypatch) -> None:
     assert all(r.magnet and r.magnet.startswith("magnet:") for r in with_magnet)
     assert all(r.seeders >= max(r.seeders for r in results[10:]) for r in with_magnet)
     assert len(requests) == 12  # 2 browses + 10 signed magnet POSTs
+
+
+async def test_empty_query_browses_default_category(monkeypatch) -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        assert request.method == "GET"
+        assert request.url.path == "/browse/"
+        assert "q" not in request.url.params
+        assert request.url.params["cat"] == "1"
+        assert request.url.params["page"] == "1"
+        assert request.url.params["page_size"] == "50"
+        return httpx.Response(
+            200,
+            text=(
+                "<script>window.searchPageToken = '31db34d4de129bc16fb0a000743a3efc';</script>"
+                '<meta name="csrf-token" content="8b79a879634e6c600c384f044ae4ab43">'
+                '<table class="search-table"><tbody></tbody></table>'
+            ),
+        )
+
+    transport = httpx.MockTransport(handler)
+
+    def new_client(_: ExtToClient) -> httpx.AsyncClient:
+        return httpx.AsyncClient(
+            base_url="https://extto.com",
+            transport=transport,
+            headers={"User-Agent": "test"},
+        )
+
+    monkeypatch.setattr(ExtToClient, "_new_client", new_client)
+    settings = Settings(api_key="test", min_interval=0, backoff_initial=0, backoff_cap=0)
+    client = ExtToClient(settings)
+    try:
+        results = await client.search("")
+    finally:
+        await client.close()
+
+    assert results == []
+    assert len(requests) == 1  # one browse, no magnet requests
