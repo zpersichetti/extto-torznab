@@ -193,26 +193,21 @@ class ExtToClient:
                 # (cat=1) since extto.com renders no results table without one.
                 ext_category = ext_category_for(category) if category else 1
             page = await self._browse(query, ext_category)
-            # Fetch magnets eagerly only for real searches (a client is about to
-            # grab a result): each magnet POST is paced (MIN_INTERVAL), so eager
-            # magnets on an empty "latest"/RSS query would stall the feed past
-            # client timeouts. RSS items are listed without a magnet and get one
-            # on demand via search/detail when a release is actually grabbed.
+            # Prowlarr's Torznab parser throws on items without an <enclosure>,
+            # and a magnet-only indexer can't serve grabs for unmagnetized items
+            # anyway, so only return the results that actually got a magnet.
+            # Real searches get the full eager budget; empty "latest"/RSS queries
+            # keep a small budget so feeds still return quickly for clients.
             ordered = sorted(page.results, key=lambda t: t.seeders, reverse=True)
-            eager = self.settings.eager_magnets if query else 0
+            eager = self.settings.eager_magnets if query else min(5, self.settings.eager_magnets)
             results: list[Torrent] = []
-            for torrent in ordered:
-                if len(results) < eager:
-                    try:
-                        torrent = torrent.with_magnet(await self._magnet(torrent.id))
-                    except UpstreamError:
-                        LOGGER.warning(
-                            "magnet fetch failed for %s; listing without magnet",
-                            torrent.id,
-                        )
-                    self._torrent_cache[torrent.id] = torrent
-                else:
-                    self._torrent_cache.setdefault(torrent.id, torrent)
+            for torrent in ordered[:eager]:
+                try:
+                    torrent = torrent.with_magnet(await self._magnet(torrent.id))
+                except UpstreamError:
+                    LOGGER.warning("magnet fetch failed for %s; skipping", torrent.id)
+                    continue
+                self._torrent_cache[torrent.id] = torrent
                 results.append(torrent)
             return results
 

@@ -89,13 +89,13 @@ async def test_verified_browse_and_magnet_protocol(monkeypatch) -> None:
         await client.close()
 
     assert browse_count == 2  # token-less first response caused a full session rotation
-    assert len(results) == 12
-    # Only the top EAGER_MAGNETS (10) by seeders get eager magnets; the rest are
-    # listed without an enclosure and resolve via t=detail.
+    assert len(results) == 10
+    # Only the top EAGER_MAGNETS (10) by seeders are returned, all with magnets;
+    # unmagnetized results are dropped because Prowlarr's Torznab parser throws
+    # on enclosure-less items and a magnet-only indexer can't serve them anyway.
     with_magnet = [r for r in results if r.magnet]
     assert len(with_magnet) == 10
     assert all(r.magnet and r.magnet.startswith("magnet:") for r in with_magnet)
-    assert all(r.seeders >= max(r.seeders for r in results[10:]) for r in with_magnet)
     assert len(requests) == 12  # 2 browses + 10 signed magnet POSTs
 
 
