@@ -57,6 +57,8 @@ GET https://extto.com/browse/?q=<query>&cat=<N>&sort=seeds&order=desc&page=N&pag
 
 - Results live in `table.search-table` (12 rows for test query; 50 default per page).
 - Row fields (each `<td>`): name+slug, size, files, age, seeds, leechs, source badge.
+  - Age cell: `<span title="09 August 2025">1 year ago</span>` — the `title` attr
+    holds the exact date; use it for Newznab `pubDate` (fallback: parse "X ago").
 - Torrent link: `href="/<slug>-<id>/"` with `class="torrent-title-link"`.
 - Magnet button: `<a class="search-magnet-btn" data-id="<id>">` (hash/name attrs
   absent on browse page — sent empty).
