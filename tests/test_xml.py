@@ -17,7 +17,7 @@ def torrent() -> Torrent:
         seeders=7,
         leechers=3,
         category=2000,
-        magnet="magnet:?xt=urn:btih:ABC&dn=Example",
+        magnet="magnet:?xt=urn:btih:15848D905FE653D6B179A3746C51B9EF7CD5D21F&dn=Example",
     )
 
 
@@ -32,14 +32,21 @@ def test_feed_is_namespaced_newznab_xml() -> None:
     enclosure = item.find("enclosure")
     assert enclosure is not None
     assert enclosure.attrib == {
-        "url": "magnet:?xt=urn:btih:ABC&dn=Example",
+        "url": "magnet:?xt=urn:btih:15848D905FE653D6B179A3746C51B9EF7CD5D21F&dn=Example",
         "length": "1024",
         "type": "application/x-bittorrent",
     }
     attrs = {
         node.attrib["name"]: node.attrib["value"] for node in item.findall(f"{{{TORZNAB_NS}}}attr")
     }
-    assert attrs == {"seeders": "7", "peers": "10", "leechers": "3", "category": "2000"}
+    assert attrs == {
+        "seeders": "7",
+        "peers": "10",
+        "leechers": "3",
+        "category": "2000",
+        "magneturl": "magnet:?xt=urn:btih:15848D905FE653D6B179A3746C51B9EF7CD5D21F&dn=Example",
+        "infohash": "15848D905FE653D6B179A3746C51B9EF7CD5D21F",
+    }
 
 
 def test_caps_advertises_search_and_categories() -> None:

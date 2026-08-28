@@ -138,3 +138,42 @@ async def test_empty_query_browses_default_category(monkeypatch) -> None:
 
     assert results == []
     assert len(requests) == 1  # one browse, no magnet requests
+
+
+async def test_empty_query_with_category_browses_that_section(monkeypatch) -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        assert request.method == "GET"
+        assert request.url.path == "/browse/"
+        assert "q" not in request.url.params
+        assert request.url.params["cat"] == "6"  # audiobook (3030) -> Books section
+        return httpx.Response(
+            200,
+            text=(
+                "<script>window.searchPageToken = '31db34d4de129bc16fb0a000743a3efc';</script>"
+                '<meta name="csrf-token" content="8b79a879634e6c600c384f044ae4ab43">'
+                '<table class="search-table"><tbody></tbody></table>'
+            ),
+        )
+
+    transport = httpx.MockTransport(handler)
+
+    def new_client(_: ExtToClient) -> httpx.AsyncClient:
+        return httpx.AsyncClient(
+            base_url="https://extto.com",
+            transport=transport,
+            headers={"User-Agent": "test"},
+        )
+
+    monkeypatch.setattr(ExtToClient, "_new_client", new_client)
+    settings = Settings(api_key="test", min_interval=0, backoff_initial=0, backoff_cap=0)
+    client = ExtToClient(settings)
+    try:
+        results = await client.search("", 3030)
+    finally:
+        await client.close()
+
+    assert results == []
+    assert len(requests) == 1  # one browse, no magnet requests (empty query skips eager magnets)

@@ -188,21 +188,21 @@ class ExtToClient:
             if query:
                 ext_category = ext_category_for(category)
             else:
-                # extto.com only renders a results table when a category is
-                # given (its bare browse page is empty), so an empty query —
-                # Prowlarr's "latest"/test probe — falls back to Movies (cat=1),
-                # the largest section, to return a real, recent result set.
-                ext_category = 1
+                # Empty query = Prowlarr/RMAB "latest" (RSS) probe. Honour the
+                # requested category when present; otherwise fall back to Movies
+                # (cat=1) since extto.com renders no results table without one.
+                ext_category = ext_category_for(category) if category else 1
             page = await self._browse(query, ext_category)
-            # Fetch magnets eagerly only for the top-seeded results: each magnet
-            # POST is paced (MIN_INTERVAL), so 50 eager magnets would stall a
-            # search for minutes. The rest are listed without an enclosure and
-            # get their magnet on demand via t=detail. A per-item failure must
-            # never kill the whole result set.
+            # Fetch magnets eagerly only for real searches (a client is about to
+            # grab a result): each magnet POST is paced (MIN_INTERVAL), so eager
+            # magnets on an empty "latest"/RSS query would stall the feed past
+            # client timeouts. RSS items are listed without a magnet and get one
+            # on demand via search/detail when a release is actually grabbed.
             ordered = sorted(page.results, key=lambda t: t.seeders, reverse=True)
+            eager = self.settings.eager_magnets if query else 0
             results: list[Torrent] = []
             for torrent in ordered:
-                if len(results) < self.settings.eager_magnets:
+                if len(results) < eager:
                     try:
                         torrent = torrent.with_magnet(await self._magnet(torrent.id))
                     except UpstreamError:

@@ -1,3 +1,4 @@
+import re
 from email.utils import format_datetime
 from xml.etree import ElementTree as ET
 
@@ -6,6 +7,13 @@ from .models import Torrent
 
 TORZNAB_NS = "http://torznab.com/schemas/2015/feed"
 ET.register_namespace("torznab", TORZNAB_NS)
+
+_INFO_HASH_RE = re.compile(r"urn:btih:([0-9a-fA-F]{40})")
+
+
+def _info_hash(magnet: str) -> str | None:
+    match = _INFO_HASH_RE.search(magnet)
+    return match.group(1) if match else None
 
 
 def render_caps() -> bytes:
@@ -62,6 +70,20 @@ def render_feed(torrents: list[Torrent], upstream_base: str) -> bytes:
                 length=str(torrent.size),
                 type="application/x-bittorrent",
             )
+            ET.SubElement(
+                item,
+                f"{{{TORZNAB_NS}}}attr",
+                name="magneturl",
+                value=torrent.magnet,
+            )
+            info_hash = _info_hash(torrent.magnet)
+            if info_hash:
+                ET.SubElement(
+                    item,
+                    f"{{{TORZNAB_NS}}}attr",
+                    name="infohash",
+                    value=info_hash,
+                )
         for name, value in (
             ("seeders", torrent.seeders),
             ("peers", torrent.seeders + torrent.leechers),
